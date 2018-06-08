@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 #include <ETH.h>
 #include <WiFi.h>
 #include <WiFiAP.h>
@@ -14,14 +15,13 @@
 WiFiMulti WiFiMulti;
 WiFiServer server(80);
 
-
 void setup()
 {
   Serial.begin(115200);
   delay(10);
 
   // We start by connecting to a WiFi network
-  WiFiMulti.addAP("orangewoodlabs", "9953562788");
+  WiFiMulti.addAP("Gaurav", "alphaman");
 
   Serial.println();
   Serial.println();
@@ -39,22 +39,75 @@ void setup()
 
   server.begin();
   delay(500);
+
+  //////Jason Setup
 }
+
 int value = 0;
+String json;
+int i = 0;
+
 
 void loop() {
   WiFiClient client = server.available();   // listen for incoming clients
-
   if (client) {                             // if you get a client,
     Serial.println("New Client.");           // print a message out the serial port
     String currentLine = "";                // make a String to hold incoming data from the client
+
     while (client.connected()) {            // loop while the client's connected
+
       if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
+        char c = client.read();
+        // read a byte, then
+        json = json + c;
+
+        if (c == '}') {
+          DynamicJsonBuffer jsonBuffer;
+          JsonObject& root = jsonBuffer.parseObject(json);
+          if (!root.success()) {
+            Serial.println("parseObject() failed");
+          }
+          int index = root["index"];
+          const char* Gcode = root["GCode"];
+          int hash_value = root["Hash_value"];
+          int hash_try = hashing(Gcode);
+          if (index == i && hash_try == hash_value) {
+            client.write("Y");
+            Serial.print(index);
+            Serial.print("\t");
+            Serial.print(Gcode);
+            Serial.print("\t");
+            Serial.print(hash_value);
+            json = "";
+            i++;
+          }
+          else {
+            client.write("N");
+            json = "";
+          }
+          index = 0;
+          Gcode = "";
+          hash_value = 0;
+
         }
-     }
-    client.stop();
-    Serial.println("Client Disconnected.");
+
+      }
+    }
+
+   client.stop();
+   Serial.println("Client Disconnected.");
   }
+  delay(10);
 }
+
+int hashing(String val)
+{ int hash = 0, i = 0;
+  while (val[i] != '\0') {
+    hash += int(val[i]) % 101;
+    ++i;
+  }
+  return hash;
+}
+
+
+
